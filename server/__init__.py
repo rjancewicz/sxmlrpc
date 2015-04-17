@@ -18,6 +18,7 @@ import hashlib
 
 import re
 import ssl
+import sys
 
 REGEX_TYPE = type(re.compile(''))
 
@@ -454,13 +455,41 @@ class SecureXMLRPCServer(SocketServer.TCPServer, SecureXMLRPCDispatcher):
 
 
     def daemonize(self):
-        pass
+        
+        try:
+            import daemon
+
+            context = daemon.DaemonContext(
+                #working_directory='/var/lib/xmlrpc',
+                umask=0002
+                #pidfile=lockfile.FileLock('/var/run/xmlrpc.pid'),
+            )
+
+            with context:
+                SocketServer.TCPServer.serve_forever(self)
+
+        except ImportError:
+            sys.stderr.write("Unable to daemonize failing back to foreground.\n")
+            self.serve_forever(daemon=False)
+
+        
+
+
 
     def serve_forever(self, daemon=False):
 
+        if daemon:
+            self.daemonize()
+        
+        else:
+            try:
+                SocketServer.TCPServer.serve_forever(self)
+            except KeyboardInterrupt: 
+                sys.stderr.write("Caught ctl-c signal exiting ... \n")
+            finally:
+                SocketServer.TCPServer.server_close()
 
 
-        SocketServer.TCPServer.serve_forever(self)
 
 
 if __name__ == "__main__":
@@ -476,5 +505,5 @@ if __name__ == "__main__":
     server.access_allow('auth.setuid', ['russell'])
 
 
-    server.serve_forever()
+    server.serve_forever(daemon=True)
 
