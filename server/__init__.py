@@ -29,7 +29,7 @@ _xmlrpc_sessions = dict({})
 
 LOG_PATH = '/var/log/xmlrpc/xmlrpc.log'
 LOG_FORMAT = "%(asctime)-15s %(message)s"
-
+PIDFILE = '/var/run/sxmlrpc.pid'
 
 class SecureXMLRPCRequestHandler(SimpleXMLRPCRequestHandler):
 
@@ -459,13 +459,7 @@ class SecureXMLRPCServer(SocketServer.TCPServer, SecureXMLRPCDispatcher):
         try:
             import daemon
 
-            context = daemon.DaemonContext(
-                #working_directory='/var/lib/xmlrpc',
-                umask=0002
-                #pidfile=lockfile.FileLock('/var/run/xmlrpc.pid'),
-            )
-
-            with context:
+            daemon.daemonize(PIDFILE)
                 SocketServer.TCPServer.serve_forever(self)
 
         except ImportError:
@@ -473,8 +467,6 @@ class SecureXMLRPCServer(SocketServer.TCPServer, SecureXMLRPCDispatcher):
             self.serve_forever(daemon=False)
 
         
-
-
 
     def serve_forever(self, daemon=False):
 
@@ -487,7 +479,7 @@ class SecureXMLRPCServer(SocketServer.TCPServer, SecureXMLRPCDispatcher):
             except KeyboardInterrupt: 
                 sys.stderr.write("Caught ctl-c signal exiting ... \n")
             finally:
-                SocketServer.TCPServer.server_close()
+                SocketServer.TCPServer.server_close(self)
 
 
 
