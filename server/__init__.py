@@ -89,6 +89,7 @@ class SecureXMLRPCDispatcher(SimpleXMLRPCDispatcher):
     
     default_access = ALLOW
     needs_username = set()
+    needs_context = set()
 
     _auth_function = None
     _users = dict()
@@ -342,6 +343,21 @@ class SecureXMLRPCDispatcher(SimpleXMLRPCDispatcher):
         else:
             raise TypeError("")
 
+    def include_context(self, methods):
+
+        if isinstance(methods, REGEX_TYPE):
+
+            for method in self.funcs.keys():
+                if methods.match(method):
+                    self.needs_context.add(method)
+
+        elif isinstance(methods, types.StringTypes):
+            self.needs_context.add(methods)
+        elif hasattr(methods, '__iter__'):
+            self.needs_context.update(set(methods))
+        else:
+            raise TypeError("")
+
     def log_event(self, message=None, omit_prefix=False, level=logging.INFO):
 
         """
@@ -397,6 +413,9 @@ class SecureXMLRPCDispatcher(SimpleXMLRPCDispatcher):
 
         if method in self.needs_username:
             params = (thread_local.username,) + params
+
+        if method in self.needs_context:
+            params = (self,) + params
 
         # by default we simply dispatch the method
         return SimpleXMLRPCDispatcher._dispatch(self, method, params)
