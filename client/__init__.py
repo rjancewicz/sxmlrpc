@@ -84,6 +84,8 @@ if __name__ == "__main__":
 
     print proxy.auth.whoami()
 
+    print proxy.unknown2("hello, world!")
+
     #print proxy.secret_echo('Hello, Fault')
 
 

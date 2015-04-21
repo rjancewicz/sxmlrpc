@@ -193,6 +193,9 @@ class SecureXMLRPCDispatcher(SimpleXMLRPCDispatcher):
     # override if needed 
     def evaluate_access(self, method, username):
 
+        if method not in self.funcs.keys():
+            return self.ALLOW
+
         access = self.default_access
 
         # apply static and dynamic rules 
@@ -372,7 +375,7 @@ class SecureXMLRPCDispatcher(SimpleXMLRPCDispatcher):
     def log_request(self, method):
 
         if method not in self.funcs:
-            self.log_event("method not found", level=logging.INFO)
+            self.log_event("- method is not supported", level=logging.INFO)
         else:
             self.log_event("", level=logging.INFO)
 
@@ -389,6 +392,7 @@ class SecureXMLRPCDispatcher(SimpleXMLRPCDispatcher):
 
         # this will raise a fault if auth is not permitted
         if not self.evaluate_access(method, thread_local.username):
+            self.log_event("ACL Access Denied")
             raise xmlrpclib.Fault(401, "Unauthorized")
 
         if method in self.needs_username:
@@ -493,6 +497,8 @@ if __name__ == "__main__":
 
     server.access_allow('auth.setuid', ['russell'])
 
+    server.register_function(lambda x: x, "unknown")
 
-    server.serve_forever(daemon=Fasle)
+
+    server.serve_forever(daemon=False)
 
