@@ -51,12 +51,15 @@ if sys.version_info >= (2, 6) and sys.version_info < (2, 7):
 
         def _parse_response_headers(self, headers):
 
-            for header in headers.split('\n'):
-                if 'set-cookie' in header.lower():
-                    cookie_str = header.split(':', 1)
-                    cookie = Cookie.SimpleCookie(cookie_str)
-                    if cookie.has_key("XMLRPC_SESSION"):
-                        self.xmlrpc_cookie = cookie["XMLRPC_SESSION"].value
+            for (key, value) in headers.items():
+                if 'SET-COOKIE' in header.upper():
+                    try:
+                        cookie = Cookie.SimpleCookie(value)
+                        if cookie.has_key("XMLRPC_SESSION"):
+                            self.xmlrpc_cookie = cookie["XMLRPC_SESSION"].value
+                    except:
+                        # we dont care about malformed headers, we just ignore them
+                        pass 
 
         def send_cookie(self, connection):
             if self.xmlrpc_cookie:
