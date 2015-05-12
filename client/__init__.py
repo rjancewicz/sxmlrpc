@@ -52,7 +52,7 @@ if sys.version_info >= (2, 6) and sys.version_info < (2, 7):
         def _parse_response_headers(self, headers):
 
             for (key, value) in headers.items():
-                if 'SET-COOKIE' in header.upper():
+                if 'SET-COOKIE' in key.upper():
                     try:
                         cookie = Cookie.SimpleCookie(value)
                         if cookie.has_key("XMLRPC_SESSION"):
