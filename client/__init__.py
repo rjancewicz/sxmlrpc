@@ -1,3 +1,5 @@
+
+import sys
 import xmlrpclib
 from xmlrpclib import Fault
 
@@ -8,20 +10,6 @@ import Cookie
 """
 
 if sys.version_info >= (2, 6) and sys.version_info < (2, 7):
-
-    from BaseHTTPServer import BaseHTTPRequestHandler
-    from StringIO import StringIO
-
-    class HTTPRequest(BaseHTTPRequestHandler):
-        def __init__(self, request_text):
-            self.rfile = StringIO(request_text)
-            self.raw_requestline = self.rfile.readline()
-            self.error_code = self.error_message = None
-            self.parse_request()
-
-        def send_error(self, code, message):
-            self.error_code = code
-            self.error_message = message
 
     class SecureXMLRPCTransport(xmlrpclib.SafeTransport):
 
@@ -63,15 +51,12 @@ if sys.version_info >= (2, 6) and sys.version_info < (2, 7):
 
         def _parse_response_headers(self, headers):
 
-            request = HTTPRequest(request_text)
-
-            print request.headers
-
-            #cookie_str = response.getheader("Set-Cookie", None)
-            #if cookie_str:
-            #    cookie = Cookie.SimpleCookie(cookie_str)
-            #    if cookie.has_key("XMLRPC_SESSION"):
-            #        self.xmlrpc_cookie = cookie["XMLRPC_SESSION"].value
+            for header in headers.split('\n'):
+                if 'set-cookie' in header.lower():
+                    cookie_str = header.split(':', 1)
+                    cookie = Cookie.SimpleCookie(cookie_str)
+                    if cookie.has_key("XMLRPC_SESSION"):
+                        self.xmlrpc_cookie = cookie["XMLRPC_SESSION"].value
 
         def send_cookie(self, connection):
             if self.xmlrpc_cookie:
