@@ -8,6 +8,21 @@ import Cookie
 """
 
 if sys.version_info >= (2, 6) and sys.version_info < (2, 7):
+
+    from BaseHTTPServer import BaseHTTPRequestHandler
+    from StringIO import StringIO
+
+    class HTTPRequest(BaseHTTPRequestHandler):
+        def __init__(self, request_text):
+            self.rfile = StringIO(request_text)
+            self.raw_requestline = self.rfile.readline()
+            self.error_code = self.error_message = None
+            self.parse_request()
+
+        def send_error(self, code, message):
+            self.error_code = code
+            self.error_message = message
+
     class SecureXMLRPCTransport(xmlrpclib.SafeTransport):
 
         xmlrpc_cookie = None
@@ -41,39 +56,22 @@ if sys.version_info >= (2, 6) and sys.version_info < (2, 7):
             except AttributeError:
                 sock = None
 
+
+            self._parse_response_headers(headers)
+
             return self._parse_response(h.getfile(), sock)
 
-        def _parse_response_headers(self, response):
+        def _parse_response_headers(self, headers):
 
-            if hasattr(response,'getheader'):
-                cookie_str = response.getheader("Set-Cookie", None)
-                if cookie_str:
-                    cookie = Cookie.SimpleCookie(cookie_str)
-                    if cookie.has_key("XMLRPC_SESSION"):
-                        self.xmlrpc_cookie = cookie["XMLRPC_SESSION"].value
-                        
-        def _parse_response(self, file, sock):
-            # read response from input file/socket, and parse it
+            request = HTTPRequest(request_text)
 
-            p, u = self.getparser()
+            print request.headers
 
-            while 1:
-                if sock:
-                    response = sock.recv(1024)
-                else:
-                    response = file.read(1024)
-                if not response:
-                    break
-                if self.verbose:
-                    print "body:", repr(response)
-
-                self._parse_response_headers(response)
-                p.feed(response)
-
-            file.close()
-            p.close()
-
-            return u.close()
+            #cookie_str = response.getheader("Set-Cookie", None)
+            #if cookie_str:
+            #    cookie = Cookie.SimpleCookie(cookie_str)
+            #    if cookie.has_key("XMLRPC_SESSION"):
+            #        self.xmlrpc_cookie = cookie["XMLRPC_SESSION"].value
 
         def send_cookie(self, connection):
             if self.xmlrpc_cookie:
