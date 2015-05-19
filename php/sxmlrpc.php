@@ -178,6 +178,7 @@ class SecureXMLRPCClient {
 }
 
 
+/*
 $xmlrpc = new SecureXMLRPCClient("https://localhost/", 1337); 
 
 var_dump( $xmlrpc->call("auth.whoami") );
@@ -185,6 +186,7 @@ var_dump( $xmlrpc->call("auth.login", ["russell", "secret"]) );
 var_dump( $xmlrpc->call("auth.whoami") );
 var_dump( $xmlrpc->call("auth.setuid", ["steve"]) );
 var_dump( $xmlrpc->call("auth.whoami") );
+*/
 
 
 
