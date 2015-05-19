@@ -130,7 +130,7 @@ class SecureXMLRPCClient(xmlrpclib.ServerProxy):
 
 if __name__ == "__main__":
 
-    proxy = SecureXMLRPCClient('http://localhost:1338')
+    proxy = SecureXMLRPCClient('http://localhost:1337')
 
     print proxy.auth.whoami()
 

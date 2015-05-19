@@ -68,7 +68,7 @@ class SecureXMLRPCRequestHandler(SimpleXMLRPCRequestHandler):
         (thread_local.client_address, _) = self.client_address
 
     def end_headers(self):
-        self.wfile.write(self.cookie)
+        self.wfile.write("{0}\n\r".format(self.cookie.output().strip()))
         SimpleXMLRPCRequestHandler.end_headers(self)
 
     def do_POST(self):
@@ -506,7 +506,7 @@ class SecureXMLRPCServer(SocketServer.TCPServer, SecureXMLRPCDispatcher):
 
 if __name__ == "__main__":
 
-    server = SecureXMLRPCServer( ("127.0.0.1", 1338) )
+    server = SecureXMLRPCServer( ("127.0.0.1", 1337) )
 
     server.register_auth_functions()
 
