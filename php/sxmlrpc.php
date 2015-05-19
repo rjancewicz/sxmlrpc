@@ -41,14 +41,14 @@ class SecureXMLRPCClient {
 
         foreach (explode("\r\n", $text) as $index => $line) {
             if ($index === 0) {
-                $headers["HTTP"] = [$line];
+                $headers["HTTP"] = array($line);
             } else {
                 list($key, $value) = explode(': ', $line, 2);
 
                 if (array_key_exists($key, $headers)) {
                     $headers[$key][] = $value;
                 } else {
-                    $headers[$key] = [$value];
+                    $headers[$key] = array($value);
                 }
             }
         }
@@ -59,11 +59,11 @@ class SecureXMLRPCClient {
     // https://tools.ietf.org/html/rfc6265#section-5.2
     static private function _parse_cookie($cookie) {
 
-        static $COOKIE_AV_PAIRS = ["Expires", "Domain", "Path"];
-        static $COOKIE_AV_SINGLES = ["Secure", "HttpOnly"];
+        static $COOKIE_AV_PAIRS = array("Expires", "Domain", "Path");
+        static $COOKIE_AV_SINGLES = array("Secure", "HttpOnly");
 
-        $cookies = [];
-        $cookies["VALUES"] = [];
+        $cookies = array();
+        $cookies["VALUES"] = array();
 
         $morsels = explode(";", $cookie);
 
