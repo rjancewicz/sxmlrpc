@@ -1,4 +1,17 @@
 <?php
+/*
+    Russell J. Jancewicz - 2015-05-19
+    
+    MIT License
+
+    Copyright (c) 2015 Russell Jancewicz
+
+    Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+    The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+*/
+
 
 define("XMLRPC_COOKIE", "XMLRPC_SESSION");
 
@@ -7,15 +20,17 @@ class SecureXMLRPCClient {
     private $xmlrpc_cookie = null;
     private $_url = null;
     private $_port = null;
+    private $_tls = true;
 
-    // todo configure SSL options passed to libcurl
-    public function __construct($url="https://127.0.0.1/RPC2", $port=1337, $proxy=false, $ssl=null) {
+    public function __construct($url="https://127.0.0.1/RPC2", $port=1337, $proxy=false, $tls=true) {
         
         $this->_url = $url;
         $this->_port = $port;
         $this->_proxy = $proxy;
+        $this->_tls = $tls;
 
         if ($proxy && array_key_exists($_COOKIE, XMLRPC_COOKIE)) {
+            // TODO X-Forwarded-For header!
             $this->xmlrpc_cookie = $_COOKIE["XMLRPC_COOKIE"];
         }
     }
@@ -78,15 +93,19 @@ class SecureXMLRPCClient {
 
     private function _init_session($headers) {
 
+        // scan all headers for Set-Cookie headers
         if (array_key_exists("Set-Cookie", $headers)) {
             foreach ($headers["Set-Cookie"] as $i => $str_cookie) {
 
+                // Parse cookies accoring to RFC
                 $cookie = SecureXMLRPCClient::_parse_cookie($str_cookie);
 
                 $values = $cookie["VALUES"];
 
+                // Search for the XMLRPC_SESSION id 
                 foreach ($values as $key => $pair) {
                     if (strcasecmp($key, XMLRPC_COOKIE) === 0) {
+                        // if found set and stop looking
                         $this->xmlrpc_cookie = $pair;
                         break;
                     }
@@ -94,23 +113,30 @@ class SecureXMLRPCClient {
             }
         }
 
+        // If we are acting as a proxy for an extrenally authenticated client
+        //  i.e. a web-browser; we pass the cookie up and allow passthorugh 
         if ($this->_proxy) {
             setcookie(XMLRPC_COOKIE, $this->xmlrpc_cookie);
         }
 
     }
 
+    // handle the pure response from the curl client
     private function _parse_response($payload, $ch) {
 
+        // split the headers and the body
         $hsize = curl_getinfo($ch, CURLINFO_HEADER_SIZE);
 
         $str_headers = substr($payload, 0, $hsize);
         $body = substr($payload, $hsize);
 
+        // parse headers 
         $headers = $this->_parse_headers($str_headers);
 
+        // use headers to get session values
         $this->_init_session($headers);
 
+        // return the decoded result 
         return xmlrpc_decode($body);
     }
 
@@ -121,31 +147,38 @@ class SecureXMLRPCClient {
         // curl handle 
         $ch = curl_init(); 
 
+        // uncomment to debug curl traffic
         //curl_setopt($ch, CURLOPT_VERBOSE, true);
 
         $headers[] = "Content-type: text/xml"; 
         $headers[] = "Accept: text/xml";
 
+        // If the cookie is available we want to pass it along
         if ($this->xmlrpc_cookie != null) {
             $headers[] = "Cookie: XMLRPC_SESSION=" . $this->xmlrpc_cookie;
         }
 
         curl_setopt($ch, CURLOPT_USERAGENT, "SecureXMLRPCClient/0.0.1");
 
+        // Setup connection - Note libcurl ignores port in the url so port must be passes
+        //  i.e. https://localhost:1339/ will not override the port option. -- possible enhancement 
         curl_setopt($ch, CURLOPT_URL, $this->_url);
         curl_setopt($ch, CURLOPT_PORT, $this->_port);
 
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+        // by default we want to check the peer certs correctly hoewever when using self-signed we need to set this to false
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, $this->_tls);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, $this->_tls);
 
+        // return header data (which we will parse for the "Set-Cooke")
         curl_setopt($ch, CURLOPT_HEADER, true);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true); 
 
+        // Use post
         curl_setopt($ch, CURLOPT_POST, true);
-
         curl_setopt($ch, CURLOPT_HTTPHEADER, $headers); 
         curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
 
+        // Send request
         $response = curl_exec($ch);
 
         # todo - cleanup error handler
@@ -161,6 +194,7 @@ class SecureXMLRPCClient {
             # we will raise a fault here 
         }
 
+        // cleanup handle
         curl_close($ch);
 
         return $data;
