@@ -20,9 +20,9 @@ class SecureXMLRPCClient {
     private $xmlrpc_cookie = null;
     private $_url = null;
     private $_port = null;
-    private $_tls = true;
+    private $_tls = 2;
 
-    public function __construct($url="https://127.0.0.1/RPC2", $port=1337, $proxy=false, $tls=true) {
+    public function __construct($url="https://127.0.0.1/RPC2", $port=1337, $proxy=false, $tls=2) {
         
         $this->_url = $url;
         $this->_port = $port;
@@ -213,7 +213,7 @@ class SecureXMLRPCClient {
 
 
 /*
-$xmlrpc = new SecureXMLRPCClient("https://localhost/", 1337); 
+$xmlrpc = new SecureXMLRPCClient("https://localhost/", 1337, null, 0); 
 
 var_dump( $xmlrpc->call("auth.whoami") );
 var_dump( $xmlrpc->call("auth.login", ["russell", "secret"]) );
