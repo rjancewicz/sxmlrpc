@@ -15,6 +15,9 @@
 
 define("XMLRPC_COOKIE", "XMLRPC_SESSION");
 
+class SXMLRPCSystemError extends Exception {}
+class SXMLRPCFault extends Exception {}
+
 class SecureXMLRPCClient {
 
     private $xmlrpc_cookie = null;
@@ -22,7 +25,7 @@ class SecureXMLRPCClient {
     private $_port = null;
     private $_tls = 2;
 
-    public function __construct($url="https://127.0.0.1/RPC2", $port=1337, $proxy=false, $tls=2) {
+    public function __construct($url="https://127.0.0.1/", $port=1337, $proxy=false, $tls=2) {
         
         $this->_url = $url;
         $this->_port = $port;
@@ -140,6 +143,12 @@ class SecureXMLRPCClient {
         return xmlrpc_decode($body);
     }
 
+    private function _raise_fault($fault) {
+        if (xmlrpc_is_fault($fault)) {
+            throw new Exception($fault["faultString"], $fault["faultCode"]);
+        }
+    }
+
     private function _dispatch($payload) {
 
         $data = null;
@@ -183,7 +192,12 @@ class SecureXMLRPCClient {
 
         # todo - cleanup error handler
         if (curl_errno($ch)) { 
-            print "Error: " . curl_error($ch) . "\n"; 
+
+            $errno = curl_errno($ch);
+            $error = curl_error($ch);
+
+            curl_close($ch);
+            throw new SXMLRPCSystemError($error, $errno);
         }
 
         $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -191,11 +205,16 @@ class SecureXMLRPCClient {
         if ($code == 200) {
             $data = $this->_parse_response($response, $ch);
         } else {
-            # we will raise a fault here 
+            curl_close($ch);
+            throw new Exception("HTTP Response Code Error", $code);
         }
 
         // cleanup handle
         curl_close($ch);
+
+        if (xmlrpc_is_fault($data)) {
+            $this->_raise_fault($data);
+        }
 
         return $data;
 
