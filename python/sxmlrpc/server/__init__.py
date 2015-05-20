@@ -184,12 +184,16 @@ class SecureXMLRPCDispatcher(SimpleXMLRPCDispatcher):
 
         if xmlrpc_session:
             (username, expire) = _xmlrpc_sessions.get(xmlrpc_session, ('anonymous', None))
+            
+            if xmlrpc_session in _xmlrpc_sessions: 
+                if expire:
+                    if expire > datetime.now():
+                        thread_local.username = username
+                    else:
+                        del _xmlrpc_sessions[xmlrpc_session]
+            else:
+                _xmlrpc_sessions[xmlrpc_session] = (username, expire)
 
-            if expire:
-                if expire > datetime.now():
-                    thread_local.username = username
-                else:
-                    del _xmlrpc_sessions[xmlrpc_session]
 
     # override if needed 
     def evaluate_access(self, method, username):
