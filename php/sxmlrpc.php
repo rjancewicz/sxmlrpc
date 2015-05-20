@@ -81,7 +81,7 @@ class SecureXMLRPCClient {
                 // skip for now
             } else {
 
-                if (stripos($morsel, "=") !==) {
+                if (stripos($morsel, "=") !== false) {
 
                     list($key, $pair) = explode("=", $morsel, 2); 
 
