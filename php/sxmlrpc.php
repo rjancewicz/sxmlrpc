@@ -145,7 +145,7 @@ class SecureXMLRPCClient {
 
     private function _raise_fault($fault) {
         if (xmlrpc_is_fault($fault)) {
-            throw new Exception($fault["faultString"], $fault["faultCode"]);
+            throw new SXMLRPCFault($fault["faultString"], $fault["faultCode"]);
         }
     }
 
