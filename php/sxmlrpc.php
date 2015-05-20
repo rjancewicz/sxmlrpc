@@ -34,7 +34,7 @@ class SecureXMLRPCClient {
 
         if ($proxy && array_key_exists(XMLRPC_COOKIE, $_COOKIE)) {
             // TODO X-Forwarded-For header!
-            $this->xmlrpc_cookie = $_COOKIE["XMLRPC_COOKIE"];
+            $this->xmlrpc_cookie = $_COOKIE[XMLRPC_COOKIE];
         }
     }
 
