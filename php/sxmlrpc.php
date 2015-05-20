@@ -32,7 +32,7 @@ class SecureXMLRPCClient {
         $this->_proxy = $proxy;
         $this->_tls = $tls;
 
-        if ($proxy && array_key_exists($_COOKIE, XMLRPC_COOKIE)) {
+        if ($proxy && array_key_exists(XMLRPC_COOKIE, $_COOKIE)) {
             // TODO X-Forwarded-For header!
             $this->xmlrpc_cookie = $_COOKIE["XMLRPC_COOKIE"];
         }
@@ -81,7 +81,7 @@ class SecureXMLRPCClient {
                 // skip for now
             } else {
 
-                if (stripos($morsel, "=") !== false) {
+                if (stripos($morsel, "=") !==) {
 
                     list($key, $pair) = explode("=", $morsel, 2); 
 
