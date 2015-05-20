@@ -235,7 +235,7 @@ class SecureXMLRPCClient {
         // cleanup handle
         curl_close($ch);
 
-        if (xmlrpc_is_fault($data)) {
+        if (is_array($data) AND xmlrpc_is_fault($data)) {
             $this->_raise_fault($data);
         }
 
