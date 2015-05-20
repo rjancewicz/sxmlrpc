@@ -21,6 +21,7 @@ class SXMLRPCFault extends Exception {}
 class SecureXMLRPCClient {
 
     private $xmlrpc_cookie = null;
+    private $x_forwarded_for = null;
     private $_url = null;
     private $_port = null;
     private $_tls = 2;
@@ -33,10 +34,25 @@ class SecureXMLRPCClient {
         $this->_tls = $tls;
 
         if ($proxy && array_key_exists(XMLRPC_COOKIE, $_COOKIE)) {
-            // TODO X-Forwarded-For header!
+            $this->x_forwarded_for = $this->_get_client_addr();
             $this->xmlrpc_cookie = $_COOKIE[XMLRPC_COOKIE];
         }
     }
+
+
+    private function _get_client_addr()  {
+
+        $addr = $_SERVER['REMOTE_ADDR'];
+
+        if (!empty($_SERVER['HTTP_CLIENT_IP'])) {
+            $addr = $_SERVER['HTTP_CLIENT_IP'];
+        } elseif (!empty($_SERVER['HTTP_X_FORWARDED_FOR'])) {
+            $addr = $_SERVER['HTTP_X_FORWARDED_FOR'];
+        }
+
+        return $addr;
+    }
+
 
     private function _parse_headers($text) {
 
@@ -168,6 +184,10 @@ class SecureXMLRPCClient {
         // If the cookie is available we want to pass it along
         if ($this->xmlrpc_cookie != null) {
             $headers[] = "Cookie: XMLRPC_SESSION=" . $this->xmlrpc_cookie;
+        }
+
+        if ($this->x_forwarded_for != null) {
+            $headers[] = "X-Forwarded-For: " . $this->x_forwarded_for;
         }
 
         curl_setopt($ch, CURLOPT_USERAGENT, "SecureXMLRPCClient/0.0.1");
