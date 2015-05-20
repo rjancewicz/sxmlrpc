@@ -46,12 +46,15 @@ class SecureXMLRPCClient {
             if ($index === 0) {
                 $headers["HTTP"] = array($line);
             } else {
-                list($key, $value) = explode(': ', $line, 2);
 
-                if (array_key_exists($key, $headers)) {
-                    $headers[$key][] = $value;
-                } else {
-                    $headers[$key] = array($value);
+                if (stripos($line, ": ") !== false) {
+                    list($key, $value) = explode(': ', $line, 2);
+
+                    if (array_key_exists($key, $headers)) {
+                        $headers[$key][] = $value;
+                    } else {
+                        $headers[$key] = array($value);
+                    }
                 }
             }
         }
@@ -78,7 +81,7 @@ class SecureXMLRPCClient {
                 // skip for now
             } else {
 
-                if (stripos($morsel, "=")) {
+                if (stripos($morsel, "=") !== false) {
 
                     list($key, $pair) = explode("=", $morsel, 2); 
 
