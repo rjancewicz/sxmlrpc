@@ -367,7 +367,7 @@ class SecureXMLRPCDispatcher(SimpleXMLRPCDispatcher):
         """
             log format
 
-            ISO8601 client_address[/proxy_address]* \[method\] username MESSAGE
+            ISO8601 client=client_address[/proxy_address]* method=<method> user=<username> MESSAGE
 
         """
 
@@ -380,14 +380,16 @@ class SecureXMLRPCDispatcher(SimpleXMLRPCDispatcher):
         proxy_address = getattr(thread_local, 'proxy_address', None)
 
         if not omit_prefix:
-            prefix = "[{method}] {username} "
+            prefix = "method=\"{method}\" user=\"{username}\" "
             message = prefix + message
 
+        forwarded_for = ""
+
         if proxy_address is not None and client_address in self._trusted_proxies:
-            client_address = "X-" + proxy_address
+            forwarded_for = "forwarded_for=" + proxy_address
 
         body = message.format(username=username, method=method)
-        body = "{client_address} {body}".format(client_address=client_address, body=body)
+        body = "client={client_address} {forwarded} {body}".format(client_address=client_address, forwarded=forwarded_for, body=body)
 
         self.logger.log(level, body)
 
