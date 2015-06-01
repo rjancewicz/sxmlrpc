@@ -20,6 +20,7 @@ import os
 import re
 import ssl
 import sys
+import stat
 
 REGEX_TYPE = type(re.compile(''))
 
@@ -30,6 +31,10 @@ _xmlrpc_sessions = dict({})
 PIDFILE = '/var/run/sxmlrpc.pid'
 LOG_PATH = '/var/log/sxmlrpc/sxmlrpc.log'
 LOG_FORMAT = "%(asctime)-15s %(message)s"
+
+TLS_NONE = 0
+TLS_TRY  = 1
+TLS_DEMAND = 2
 
 
 class SecureXMLRPCRequestHandler(SimpleXMLRPCRequestHandler):
@@ -457,7 +462,7 @@ class SecureXMLRPCServer(SocketServer.TCPServer, SecureXMLRPCDispatcher):
 
     def __init__(self, addr, request_handler=SecureXMLRPCRequestHandler,
                  logRequests=True, allow_none=True, encoding=None, bind_and_activate=True,
-                 crtfile="./certificate.crt", keyfile="./certificate.key"):
+                 tls=TLS_TRY, crtfile="./certificate.crt", keyfile="./certificate.key"):
         self.logRequests = logRequests
 
         SimpleXMLRPCDispatcher.__init__(self, allow_none, encoding)
@@ -468,7 +473,25 @@ class SecureXMLRPCServer(SocketServer.TCPServer, SecureXMLRPCDispatcher):
             flags |= fcntl.FD_CLOEXEC
             fcntl.fcntl(self.fileno(), fcntl.F_SETFD, flags)
 
-        self.socket = ssl.wrap_socket(self.socket, keyfile=keyfile, certfile=crtfile)
+
+        if tls != TLS_NONE:
+
+            try:
+                cstat = stat.S_ISREG(os.stat(crtfile).st_mode)
+                kstat = stat.S_ISREG(os.stat(keyfile).st_mode)
+                if cstat and kstat:
+                    self.socket = ssl.wrap_socket(self.socket, keyfile=keyfile, certfile=crtfile)
+                else:
+                    raise OSError
+            except OSError: 
+                if tls == TLS_DEMAND:
+                    sys.stderr.write(">>> SSL Error: [Fatal] TLS_DEMAND is specified however the Certificate or Key could not be found.\n")
+                    sys.stderr.write(">>>     crtfile = {0}\n".format(crtfile))
+                    sys.stderr.write(">>>     keyfile = {0}\n".format(keyfile))
+                    sys.exit(-1)
+                else:
+                    sys.stderr.write(">>> SSL Error: Certificate or Key could not be found, starting unencrypted XMLRPC service.\n")
+
 
         self.configure_logging()
 
@@ -503,9 +526,9 @@ class SecureXMLRPCServer(SocketServer.TCPServer, SecureXMLRPCDispatcher):
                 self.logger.info("Starting Secure XMLRPC Server [foreground]: https://{0}:{1}/".format(self.server_address[0], self.server_address[1]))
                 SocketServer.TCPServer.serve_forever(self)
             except KeyboardInterrupt: 
-                sys.stderr.write("Caught ctl-c signal exiting ... \n")
+                sys.stderr.write("Caught ctl-c signal gracefully exiting ... \n")
             finally:
-                SocketServer.TCPServer.server_close()
+                SocketServer.TCPServer.server_close(self)
 
 
 

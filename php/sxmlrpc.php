@@ -200,6 +200,7 @@ class SecureXMLRPCClient {
         // by default we want to check the peer certs correctly hoewever when using self-signed we need to set this to false
         curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, $this->_tls);
         curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, $this->_tls);
+        #curl_setopt($ch, CURLOPT_SSLVERSION, $this->_ssl_version); 
 
         // return header data (which we will parse for the "Set-Cooke")
         curl_setopt($ch, CURLOPT_HEADER, true);
