@@ -28,14 +28,16 @@ class SecureXMLRPCClient {
 
     public function __construct($url="https://127.0.0.1/", $port=1337, $proxy=false, $tls=2) {
         
+        session_start();
+
         $this->_url = $url;
         $this->_port = $port;
         $this->_proxy = $proxy;
         $this->_tls = $tls;
 
-        if ($proxy && array_key_exists(XMLRPC_COOKIE, $_COOKIE)) {
+        if ($proxy && array_key_exists(XMLRPC_COOKIE, $_SESSION)) {
             $this->x_forwarded_for = $this->_get_client_addr();
-            $this->xmlrpc_cookie = $_COOKIE[XMLRPC_COOKIE];
+            $this->xmlrpc_cookie = $_SESSION[XMLRPC_COOKIE];
         }
     }
 
@@ -138,7 +140,8 @@ class SecureXMLRPCClient {
         // If we are acting as a proxy for an extrenally authenticated client
         //  i.e. a web-browser; we pass the cookie up and allow passthorugh 
         if ($this->_proxy) {
-            setcookie(XMLRPC_COOKIE, $this->xmlrpc_cookie);
+            $_SESSION[XMLRPC_COOKIE] = $this->xmlrpc_cookie;
+            #setcookie(XMLRPC_COOKIE, $this->xmlrpc_cookie);
         }
 
     }
