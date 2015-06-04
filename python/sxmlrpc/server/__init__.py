@@ -29,19 +29,26 @@ thread_local = threading.local()
 _xmlrpc_sessions = dict({})
 
 PIDFILE = '/var/run/sxmlrpc.pid'
-LOG_PATH = '/var/log/sxmlrpc/sxmlrpc.log'
+
+LOG_DIR = '/var/log/sxmlrpc'
+
+DISPATCH_LOG = 'dispatch.log'
+EVENT_LOG    = 'events.log'
+FAULT_LOG    = 'faults.log'
+
 LOG_FORMAT = "%(asctime)-15s %(message)s"
 
-TLS_NONE = 0
-TLS_TRY  = 1
+TLS_NONE   = 0
+TLS_TRY    = 1
 TLS_DEMAND = 2
-
 
 class SecureXMLRPCRequestHandler(SimpleXMLRPCRequestHandler):
 
     XMLRPC_COOKIE = "XMLRPC_SESSION"
 
     def init_session(self):
+
+        thread_local.thread_status = True
 
         xmlrpc_session = None 
 
@@ -96,6 +103,8 @@ class SecureXMLRPCDispatcher(SimpleXMLRPCDispatcher):
     needs_username = set()
     needs_context = set()
 
+    log_faults = True
+
     _auth_function = None
     _users = dict()
 
@@ -145,8 +154,6 @@ class SecureXMLRPCDispatcher(SimpleXMLRPCDispatcher):
             (prior, expire) = _xmlrpc_sessions.get(xmlrpc_session, ('_', datetime.now()))
             _xmlrpc_sessions[xmlrpc_session] = (username, expire)
             self._setup_session()
-
-            self.log_event("[{{method}}] {prior} -> {{username}}".format(prior=prior), omit_prefix=True)
 
             return True
 
@@ -367,7 +374,8 @@ class SecureXMLRPCDispatcher(SimpleXMLRPCDispatcher):
         else:
             raise TypeError("")
 
-    def log_event(self, message=None, omit_prefix=False, level=logging.INFO):
+    '''
+    def log_event(self, message=None, level=logging.INFO):
 
         """
             log format
@@ -382,7 +390,7 @@ class SecureXMLRPCDispatcher(SimpleXMLRPCDispatcher):
         method         = getattr(thread_local, 'method', 'NULL')
         username       = getattr(thread_local, 'username', 'anonymous')
         client_address = getattr(thread_local, 'client_address', "0.0.0.0")
-        proxy_address = getattr(thread_local, 'proxy_address', None)
+        proxy_address  = getattr(thread_local, 'proxy_address', None)
 
         if not omit_prefix:
             prefix = "method=\"{method}\" user=\"{username}\" "
@@ -397,14 +405,40 @@ class SecureXMLRPCDispatcher(SimpleXMLRPCDispatcher):
         body = "client={client_address} {forwarded} {body}".format(client_address=client_address, forwarded=forwarded_for, body=body)
 
         self.logger.log(level, body)
+    '''
 
+    def _log_dispatch(self, method):
 
-    def log_request(self, method):
+        prefix = self._log_prefix()
+
+        message = ""
 
         if method not in self.funcs:
-            self.log_event("- method is not supported", level=logging.INFO)
+            message = "- requested method is not supported."
+
+        body = "{prefix} {message}".format(
+            prefix = prefix,
+            message = message)
+
+        self._dispatch_logger.info(body)
+
+    def _log_fault(self, fault):
+
+        if isinstance(fault, Exception) or isinstance(fault, Fault):
+
+            prefix = self._log_prefix()
+
+            message = repr(fault)
+
+            body = "{prefix} {message}".format(
+                prefix = prefix,
+                message = message)
+
+            self._fault_logger.error(body)
+
         else:
-            self.log_event("", level=logging.INFO)
+
+            pass # todo - log the fact that we tried to log a non-fault
 
 
     def _dispatch(self, method, params):
@@ -414,22 +448,29 @@ class SecureXMLRPCDispatcher(SimpleXMLRPCDispatcher):
         # when logging if method is None we will assume that we are logging from within the method
         thread_local.method = method
 
-        self.log_request(method)
-
+        self._log_dispatch(method)
 
         # this will raise a fault if auth is not permitted
-        if not self.evaluate_access(method, thread_local.username):
-            self.log_event("ACL Access Denied")
-            raise xmlrpclib.Fault(401, "Unauthorized")
+        try:
+            if not self.evaluate_access(method, thread_local.username):
+                self.log_event("ACL Access Denied")
+                raise xmlrpclib.Fault(401, "Unauthorized")
 
-        if method in self.needs_username:
-            params = (thread_local.username,) + params
+            if method in self.needs_username:
+                params = (thread_local.username,) + params
 
-        if method in self.needs_context:
-            params = (self,) + params
+            if method in self.needs_context:
+                params = (self,) + params
 
-        # by default we simply dispatch the method
-        return SimpleXMLRPCDispatcher._dispatch(self, method, params)
+            # by default we simply dispatch the method
+            return SimpleXMLRPCDispatcher._dispatch(self, method, params)
+        except Exception as fault:
+
+            if self.log_faults: 
+                self._log_fault(fault)
+
+            raise fault
+
 
 
 """
@@ -448,16 +489,71 @@ class SecureXMLRPCServer(SocketServer.TCPServer, SecureXMLRPCDispatcher):
 
     def configure_logging(self, level=logging.DEBUG):
 
-        directory = os.path.dirname(LOG_PATH)
+        if not os.path.exists(LOG_DIR):
+            os.makedirs(LOG_DIR)
 
-        if not os.path.exists(directory):
-            os.makedirs(directory)
+        dispatch_path = "{0}/{1}".format(LOG_DIR, DISPATCH_LOG)
+        fault_path    = "{0}/{1}".format(LOG_DIR, FAULT_LOG)
+        event_path    = "{0}/{1}".format(LOG_DIR, EVENT_LOG)
 
-        logging.basicConfig(format=LOG_FORMAT, filename=LOG_PATH)
+        formatter = logging.Formatter(LOG_FORMAT)
 
-        self.logger = logging.getLogger('sxmlrpc')
+        self._dispatch_logger = logging.getLogger('sxmlrpc-dispatch')
+        self._fault_logger    = logging.getLogger('sxmlrpc-faults')
+        self._event_logger    = logging.getLogger('sxmlrpc')
 
-        self.logger.setLevel(level)
+        # todo replace with auto-rotate handler 
+        dispatch_handler = logging.FileHandler(dispatch_path)
+        fault_handler    = logging.FileHandler(fault_path)
+        event_handler    = logging.FileHandler(event_path)
+
+        dispatch_handler.setFormatter(formatter)
+        fault_handler.setFormatter(formatter)
+        event_handler.setFormatter(formatter)
+
+        self._dispatch_logger.addHandler(dispatch_handler)
+        self._fault_logger.addHandler(fault_handler)
+        self._event_logger.addHandler(event_handler)
+
+        self._dispatch_logger.setLevel(level)
+        self._fault_logger.setLevel(level)
+        self._event_logger.setLevel(level)
+
+        #global sxmlrpc_logger
+        #sxmlrpc_log_event = self.log_event
+
+    def _log_prefix(self):
+
+        method         = getattr(thread_local, 'method', 'NULL')
+        username       = getattr(thread_local, 'username', 'anonymous')
+        client_address = getattr(thread_local, 'client_address', "0.0.0.0")
+        proxy_address  = getattr(thread_local, 'proxy_address', None)
+        forwarded_for  = ""
+
+        if proxy_address is not None and client_address in self._trusted_proxies:
+            forwarded_for = " forwarded_for=" + proxy_address
+
+        prefix = "client_address={client}{forward} method=\"{method}\" user=\"{username}\"".format(
+            client = client_address,
+            forward = forwarded_for,
+            method = method,
+            username = username
+            )
+
+        return prefix
+
+    def log_event(self, message, level=logging.INFO):
+
+        prefix = "<<SXMLRPC SERVER>>"
+
+        thread_status = getattr(thread_local, 'thread_status', False)
+
+        if thread_status:
+            prefix = self._log_prefix()
+
+        body = "{prefix} {message}".format(prefix=prefix, message=message)
+
+        self._event_logger.log(level, body)
 
 
     def __init__(self, addr, request_handler=SecureXMLRPCRequestHandler,
@@ -508,7 +604,7 @@ class SecureXMLRPCServer(SocketServer.TCPServer, SecureXMLRPCDispatcher):
             import daemon
 
             daemon.daemonize(PIDFILE)
-            self.logger.info("Starting Secure XMLRPC Server [background]: https://{0}:{1}/".format(self.server_address[0], self.server_address[1]))
+            self.log_event("Starting Secure XMLRPC Server [background]: https://{0}:{1}/".format(self.server_address[0], self.server_address[1]))
             SocketServer.TCPServer.serve_forever(self)
 
         except ImportError:
@@ -523,7 +619,7 @@ class SecureXMLRPCServer(SocketServer.TCPServer, SecureXMLRPCDispatcher):
         
         else:
             try:
-                self.logger.info("Starting Secure XMLRPC Server [foreground]: https://{0}:{1}/".format(self.server_address[0], self.server_address[1]))
+                self.log_event("Starting Secure XMLRPC Server [foreground]: https://{0}:{1}/".format(self.server_address[0], self.server_address[1]))
                 SocketServer.TCPServer.serve_forever(self)
             except KeyboardInterrupt: 
                 sys.stderr.write("Caught ctl-c signal gracefully exiting ... \n")
@@ -531,22 +627,30 @@ class SecureXMLRPCServer(SocketServer.TCPServer, SecureXMLRPCDispatcher):
                 SocketServer.TCPServer.server_close(self)
 
 
+def log_example():
+
+    server.log_event("Sample Event Log")
 
 
 if __name__ == "__main__":
+
+    global server
 
     server = SecureXMLRPCServer( ("127.0.0.1", 1337) )
 
     server.register_auth_functions()
 
     server.register_function(lambda x: x, "echo")
+    server.register_function(log_example, "log_example")
 
     server.register_user('russell', 'secret')
 
     server.access_allow('auth.setuid', ['russell'])
+    server.access_allow_everyone('log_example')
+
+    server.log_event("Example System Log")
 
     server.register_function(lambda x: x, "unknown")
-
 
     server.serve_forever(daemon=False)
 
