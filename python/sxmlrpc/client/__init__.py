@@ -3,6 +3,9 @@ import sys
 import xmlrpclib
 from xmlrpclib import Fault
 
+# to test when TLS is disabled
+#from xmlrpclib import ServerProxy as SecureXMLRPCClient
+
 import Cookie
 
 """
@@ -132,12 +135,13 @@ if __name__ == "__main__":
 
     proxy = SecureXMLRPCClient('http://localhost:1337')
 
+    print proxy.log_example()
+
     print proxy.auth.whoami()
 
     print proxy.auth.login('russell','secret')
 
     print proxy.auth.whoami()
-
 
     print proxy.auth.setuid('steve')
 
